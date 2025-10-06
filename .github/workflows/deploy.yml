@@ -34,15 +34,32 @@ jobs:
           docker push $IMAGE_URI
 
       # 5️⃣ SSH into EC2 and deploy
-      - name: Deploy on EC2
-        uses: appleboy/ssh-action@v0.1.6
-        with:
-          host: ${{ secrets.EC2_PUBLIC_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            docker pull ${{ steps.login-ecr.outputs.registry }}/nodeapp:latest
-            docker stop nodeapp || true
-            docker rm nodeapp || true
-            docker run -d -p 3000:3000 --name nodeapp ${{ steps.login-ecr.outputs.registry }}/nodeapp:latest
+ - name: Deploy on EC2
+      uses: appleboy/ssh-action@v0.1.6
+      with:
+        host: ${{ secrets.EC2_PUBLIC_IP }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Install AWS CLI if not already installed
+          if ! command -v aws &> /dev/null
+          then
+            echo "Installing AWS CLI..."
+            sudo apt-get update -y
+            sudo apt-get install -y awscli
+          fi
 
+          # Login to ECR
+          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 851725330786.dkr.ecr.ap-south-1.amazonaws.com
+
+          # Pull the latest image
+          docker pull 851725330786.dkr.ecr.ap-south-1.amazonaws.com/nodeapp:latest
+
+          # Stop and remove old container if it exists
+          docker stop nodeapp || true
+          docker rm nodeapp || true
+
+          # Run the new container
+          docker run -d -p 3000:3000 --name nodeapp 851725330786.dkr.ecr.ap-south-1.amazonaws.com/nodeapp:latest          
+          
+          
